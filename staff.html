@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Staff Carwash System</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+        }
+
+        /* navbar */
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 60px;
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .menu button {
+            background: #e74c3c;
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        /* dashboard */
+
+        .dashboard {
+            display: flex;
+            gap: 20px;
+            padding: 30px 60px;
+        }
+
+        .card {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .card h2 {
+            font-size: 35px;
+            margin: 0;
+        }
+
+        /* form */
+
+        .form {
+            padding: 20px 60px;
+        }
+
+        .form input,
+        .form select {
+            padding: 8px;
+            margin-right: 10px;
+            border-radius: 6px;
+            border: none;
+        }
+
+        .form button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            background: #00c6ff;
+            color: white;
+            cursor: pointer;
+        }
+
+        /* table */
+
+        .container {
+            padding: 20px 60px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* status */
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 6px;
+        }
+
+        .wait {
+            background: #f1c40f;
+        }
+
+        .progress {
+            background: #3498db;
+        }
+
+        .done {
+            background: #2ecc71;
+        }
+
+        button.action {
+            background: #007bff;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .search {
+            padding: 0 60px;
+            margin-top: 10px;
+        }
+
+        .search input {
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="navbar">
+        <div>🚗 ระบบพนักงานล้างรถ</div>
+        <div class="menu">
+            <button onclick="logout()">ออกจากระบบ</button>
+        </div>
+    </div>
+
+    <!-- dashboard -->
+
+    <div class="dashboard">
+
+        <div class="card">
+            <p>รถทั้งหมด</p>
+            <h2 id="total">0</h2>
+        </div>
+
+        <div class="card">
+            <p>กำลังล้าง</p>
+            <h2 id="washing">0</h2>
+        </div>
+
+        <div class="card">
+            <p>เสร็จแล้ว</p>
+            <h2 id="done">0</h2>
+        </div>
+
+    </div>
+
+    <!-- add queue -->
+
+    <div class="form">
+
+        <input type="text" id="name" placeholder="ชื่อลูกค้า">
+
+        <input type="text" id="plate" placeholder="ทะเบียนรถ">
+
+        <select id="package">
+            <option>Basic</option>
+            <option>Premium</option>
+            <option>VIP</option>
+        </select>
+
+        <input type="time" id="time">
+
+        <button onclick="addQueue()">เพิ่มคิว</button>
+
+    </div>
+
+    <!-- search -->
+
+    <div class="search">
+        <input type="text" id="search" placeholder="ค้นหาลูกค้า/ทะเบียน" onkeyup="searchQueue()">
+    </div>
+
+    <!-- table -->
+
+    <div class="container">
+
+        <table>
+
+            <tr>
+                <th>ลูกค้า</th>
+                <th>ทะเบียน</th>
+                <th>แพ็คเกจ</th>
+                <th>เวลา</th>
+                <th>สถานะ</th>
+                <th>เริ่มล้าง</th>
+                <th>เสร็จ</th>
+                <th>เวลาที่ใช้</th>
+                <th>จัดการ</th>
+            </tr>
+
+            <tbody id="tableBody"></tbody>
+
+        </table>
+
+    </div>
+
+    <script>
+
+        /* ตรวจสอบ role */
+
+        let role = localStorage.getItem("userRole");
+
+        if (role !== "staff") {
+            alert("คุณไม่มีสิทธิ์เข้า");
+            window.location.href = "index.html";
+        }
+
+        /* data */
+
+        let bookings = JSON.parse(localStorage.getItem("bookings")) || [];
+
+        /* load table */
+
+        function loadTable() {
+
+            let table = document.getElementById("tableBody");
+
+            table.innerHTML = "";
+
+            bookings.forEach((b, i) => {
+
+                table.innerHTML += `
+
+<tr>
+
+<td>${b.name}</td>
+<td>${b.plate}</td>
+<td>${b.package}</td>
+<td>${b.time}</td>
+
+<td>
+<span class="status ${b.status}">
+${statusText(b.status)}
+</span>
+</td>
+
+<td>${b.start || "-"}</td>
+<td>${b.finish || "-"}</td>
+<td>${b.duration || "-"}</td>
+
+<td>
+<button class="action" onclick="updateStatus(${i})">
+อัปเดต
+</button>
+</td>
+
+</tr>
+
+`;
+
+            });
+
+            updateDashboard();
+
+        }
+
+        /* status text */
+
+        function statusText(s) {
+
+            if (s === "wait") return "รอคิว";
+            if (s === "progress") return "กำลังล้าง";
+            if (s === "done") return "เสร็จแล้ว";
+
+        }
+
+        /* add queue */
+
+        function addQueue() {
+
+            let name = document.getElementById("name").value;
+            let plate = document.getElementById("plate").value;
+            let pack = document.getElementById("package").value;
+            let time = document.getElementById("time").value;
+
+            if (!name || !plate || !time) {
+
+                alert("กรอกข้อมูลให้ครบ");
+
+                return;
+
+            }
+
+            bookings.push({
+
+                name: name,
+                plate: plate,
+                package: pack,
+                time: time,
+                status: "wait"
+
+            });
+
+            save();
+
+        }
+
+        /* update status */
+
+        function updateStatus(i) {
+
+            let now = new Date();
+
+            let t = now.getHours() + ":" + String(now.getMinutes()).padStart(2, '0');
+
+            if (bookings[i].status === "wait") {
+
+                bookings[i].status = "progress";
+                bookings[i].start = t;
+
+            }
+
+            else if (bookings[i].status === "progress") {
+
+                bookings[i].status = "done";
+                bookings[i].finish = t;
+
+                let start = new Date("1970-01-01T" + bookings[i].start + ":00");
+                let end = new Date("1970-01-01T" + t + ":00");
+
+                let diff = (end - start) / 60000;
+
+                bookings[i].duration = diff + " นาที";
+
+            }
+
+            save();
+
+        }
+
+        /* dashboard */
+
+        function updateDashboard() {
+
+            let total = bookings.length;
+
+            let washing = bookings.filter(b => b.status === "progress").length;
+
+            let done = bookings.filter(b => b.status === "done").length;
+
+            document.getElementById("total").innerText = total;
+            document.getElementById("washing").innerText = washing;
+            document.getElementById("done").innerText = done;
+
+        }
+
+        /* search */
+
+        function searchQueue() {
+
+            let input = document.getElementById("search").value.toLowerCase();
+
+            let rows = document.querySelectorAll("#tableBody tr");
+
+            rows.forEach(row => {
+
+                let text = row.innerText.toLowerCase();
+
+                row.style.display = text.includes(input) ? "" : "none";
+
+            });
+
+        }
+
+        /* save */
+
+        function save() {
+
+            localStorage.setItem("bookings", JSON.stringify(bookings));
+
+            loadTable();
+
+        }
+
+        /* logout */
+
+        function logout() {
+
+            localStorage.clear();
+
+            window.location.href = "index.html";
+
+        }
+
+        loadTable();
+
+    </script>
+
+</body>
+
+</html>
